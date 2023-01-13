@@ -5,22 +5,31 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "timejerk login",
+            "name": "login",
             "type": "go",
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}/cmd/teamjerk/main.go",
             "console": "integratedTerminal",
             "args": ["login"]
-        }
-,        {
-            "name": "timejerk whoami",
+        },
+        {
+            "name": "whoami",
             "type": "go",
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}/cmd/teamjerk/main.go",
             "console": "integratedTerminal",
             "args": ["whoami"]
+        },
+        {
+            "name": "projects",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/teamjerk/main.go",
+            "console": "integratedTerminal",
+            "args": ["projects"]
         }
     ]
 }

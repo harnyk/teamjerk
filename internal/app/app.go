@@ -83,8 +83,7 @@ func (a *app) LogIn() error {
 }
 
 func (a *app) WhoAmI() error {
-	exists := a.store.Exists()
-	if !exists {
+	if !a.store.Exists() {
 		return fmt.Errorf("not logged in")
 	}
 
@@ -111,5 +110,23 @@ func (a *app) LogOut() error {
 }
 
 func (a *app) Projects() error {
-	panic("implement me")
+	if !a.store.Exists() {
+		return fmt.Errorf("not logged in")
+	}
+
+	auth, err := a.store.Load()
+	if err != nil {
+		return err
+	}
+
+	res, err := a.tw.GetProjects(auth)
+	if err != nil {
+		return err
+	}
+
+	for _, project := range res.Projects {
+		fmt.Printf("[ID: %s] %s\n", project.ID, project.Name)
+	}
+
+	return nil
 }

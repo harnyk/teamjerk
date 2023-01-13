@@ -89,8 +89,3 @@ type ProjectTemplate struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
 }
-
-type ProjectCategory struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
-}

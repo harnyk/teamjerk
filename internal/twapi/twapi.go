@@ -16,6 +16,7 @@ type Client interface {
 	GetAccountsToLogIn(email, password string) (*AccountsResponse, error)
 	LogIn(apiEndPoint, email, password string) (*AuthData, error)
 	GetMe(authData *AuthData) (*ProfileResponse, error)
+	GetProjects(authData *AuthData) (*ProjectsResponse, error)
 }
 
 type client struct {
@@ -119,4 +120,29 @@ func (c *client) GetMe(authData *AuthData) (*ProfileResponse, error) {
 	}
 
 	return user, nil
+}
+
+func (c *client) GetProjects(authData *AuthData) (*ProjectsResponse, error) {
+	client := resty.New()
+
+	projects := &ProjectsResponse{}
+
+	resp, err := client.R().
+		SetHeader("Content-Type", "application/json").
+		SetCookie(&http.Cookie{
+			Name:  "tw-auth",
+			Value: authData.Token,
+		}).
+		SetResult(projects).
+		Get(authData.APIEndPoint + "projects.json")
+
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode() != 200 {
+		return nil, fmt.Errorf("status code: %d", resp.StatusCode())
+	}
+
+	return projects, nil
 }
