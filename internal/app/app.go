@@ -26,10 +26,6 @@ func NewApp(tw twapi.Client, store authstore.AuthStore[twapi.AuthData]) App {
 }
 
 func (a *app) LogIn() error {
-	//read email from stdin
-	// email, err := gopass.GetPasswdPrompt("Email: ",
-	// 	false, os.Stdin, os.Stdout)
-	// This is wrong. Do not use gopass for email. Use fmt.Scanln instead.
 
 	var email string
 	fmt.Print("Email: ")
@@ -38,7 +34,6 @@ func (a *app) LogIn() error {
 		return err
 	}
 
-	//read password from stdin hiding the input
 	password, err := gopass.GetPasswdPrompt("Password: ",
 		false, os.Stdin, os.Stdout)
 	if err != nil {
