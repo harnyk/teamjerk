@@ -17,6 +17,7 @@ type Client interface {
 	LogIn(apiEndPoint, email, password string) (*AuthData, error)
 	GetMe(authData *AuthData) (*ProfileResponse, error)
 	GetProjects(authData *AuthData) (*ProjectsResponse, error)
+	GetTasks(authData *AuthData) (*TasksResponse, error)
 }
 
 type client struct {
@@ -98,16 +99,9 @@ func (c *client) LogIn(apiEndPoint, email, password string) (*AuthData, error) {
 }
 
 func (c *client) GetMe(authData *AuthData) (*ProfileResponse, error) {
-	client := resty.New()
-
 	user := &ProfileResponse{}
 
-	resp, err := client.R().
-		SetHeader("Content-Type", "application/json").
-		SetCookie(&http.Cookie{
-			Name:  "tw-auth",
-			Value: authData.Token,
-		}).
+	resp, err := c.getAuthenticatedRequest(authData).
 		SetResult(user).
 		Get(authData.APIEndPoint + "me.json")
 
@@ -123,16 +117,9 @@ func (c *client) GetMe(authData *AuthData) (*ProfileResponse, error) {
 }
 
 func (c *client) GetProjects(authData *AuthData) (*ProjectsResponse, error) {
-	client := resty.New()
-
 	projects := &ProjectsResponse{}
 
-	resp, err := client.R().
-		SetHeader("Content-Type", "application/json").
-		SetCookie(&http.Cookie{
-			Name:  "tw-auth",
-			Value: authData.Token,
-		}).
+	resp, err := c.getAuthenticatedRequest(authData).
 		SetResult(projects).
 		Get(authData.APIEndPoint + "projects.json")
 
@@ -145,4 +132,33 @@ func (c *client) GetProjects(authData *AuthData) (*ProjectsResponse, error) {
 	}
 
 	return projects, nil
+}
+
+func (c *client) GetTasks(authData *AuthData) (*TasksResponse, error) {
+	tasks := &TasksResponse{}
+
+	resp, err := c.getAuthenticatedRequest(authData).
+		SetResult(tasks).
+		Get(authData.APIEndPoint + "tasks.json")
+
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode() != 200 {
+		return nil, fmt.Errorf("status code: %d", resp.StatusCode())
+	}
+
+	return tasks, nil
+}
+
+func (c *client) getAuthenticatedRequest(authData *AuthData) *resty.Request {
+	client := resty.New()
+
+	return client.R().
+		SetHeader("Content-Type", "application/json").
+		SetCookie(&http.Cookie{
+			Name:  "tw-auth",
+			Value: authData.Token,
+		})
 }

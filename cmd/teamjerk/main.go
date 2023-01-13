@@ -22,6 +22,7 @@ const (
 	logout   command = "logout"
 	whoami   command = "whoami"
 	projects command = "projects"
+	tasks    command = "tasks"
 )
 
 func getAuthFilePath() (string, error) {
@@ -42,6 +43,7 @@ Usage:
   teamjerk logout
   teamjerk whoami
   teamjerk projects
+  teamjerk tasks
 `
 
 	arguments, err := docopt.ParseArgs(usage, nil, version)
@@ -72,6 +74,8 @@ Usage:
 		err = app.WhoAmI()
 	case projects:
 		err = app.Projects()
+	case tasks:
+		err = app.Tasks()
 	}
 
 	if err != nil {
@@ -81,7 +85,7 @@ Usage:
 }
 
 func getCommand(arguments docopt.Opts) (command, error) {
-	for _, c := range []command{login, logout, whoami, projects} {
+	for _, c := range []command{login, logout, whoami, projects, tasks} {
 		cmdSelected, err := arguments.Bool(string(c))
 		if err != nil {
 			return "", err

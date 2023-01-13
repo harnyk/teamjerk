@@ -14,6 +14,7 @@ type App interface {
 	WhoAmI() error
 	LogOut() error
 	Projects() error
+	Tasks() error
 }
 
 type app struct {
@@ -126,6 +127,33 @@ func (a *app) Projects() error {
 
 	for _, project := range res.Projects {
 		fmt.Printf("[ID: %s] %s\n", project.ID, project.Name)
+	}
+
+	return nil
+}
+
+func (a *app) Tasks() error {
+	if !a.store.Exists() {
+		return fmt.Errorf("not logged in")
+	}
+
+	auth, err := a.store.Load()
+	if err != nil {
+		return err
+	}
+
+	res, err := a.tw.GetTasks(auth)
+	if err != nil {
+		return err
+	}
+
+	taskGroups := res.GroupByProject()
+
+	for _, taskGroup := range taskGroups {
+		fmt.Printf("[ProjectID: %d] %s\n", taskGroup.Project.ID, taskGroup.Project.Name)
+		for _, task := range taskGroup.Tasks {
+			fmt.Printf("  [ID: %d] %s\n", task.ID, task.Content)
+		}
 	}
 
 	return nil
