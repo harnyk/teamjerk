@@ -3,9 +3,12 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 
 	"github.com/docopt/docopt-go"
 	"github.com/harnyk/teamjerk/internal/app"
+	"github.com/harnyk/teamjerk/internal/authstore"
 	"github.com/harnyk/teamjerk/internal/twapi"
 )
 
@@ -20,6 +23,15 @@ const (
 	whoami   command = "whoami"
 	projects command = "projects"
 )
+
+func getAuthFilePath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(home, ".teamjerk", "auth.json"), nil
+}
 
 func main() {
 
@@ -42,8 +54,14 @@ Usage:
 		log.Fatal(err)
 	}
 
-	tw := twapi.NewClient("skeliasarl", "eu")
-	app := app.NewApp(tw)
+	authFilePath, err := getAuthFilePath()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tw := twapi.NewClient()
+	store := authstore.NewAuthStore[twapi.AuthData](authFilePath)
+	app := app.NewApp(tw, store)
 
 	switch cmd {
 	case login:

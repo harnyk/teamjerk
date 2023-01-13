@@ -8,36 +8,56 @@ import (
 )
 
 type AuthData struct {
-	Token string
-}
-
-type User struct {
-	ID        string `json:"id"`
-	FirstName string `json:"first-name"`
-	LastName  string `json:"last-name"`
+	APIEndPoint string
+	Token       string
 }
 
 type Client interface {
-	LogIn(email, password string) (*AuthData, error)
-	GetMe(authData *AuthData) (*User, error)
+	GetAccountsToLogIn(email, password string) (*AccountsResponse, error)
+	LogIn(apiEndPoint, email, password string) (*AuthData, error)
+	GetMe(authData *AuthData) (*ProfileResponse, error)
 }
 
 type client struct {
-	companySlug string
-	zone        string
 }
 
-func NewClient(companySlug, zone string) Client {
-	return &client{companySlug: companySlug, zone: zone}
+func NewClient() Client {
+	return &client{}
 }
 
 func (c *client) baseURL() string {
-	return "https://" + c.companySlug + "." + c.zone + ".teamwork.com"
+	return "https://www.teamwork.com"
 }
 
-func (c *client) LogIn(email, password string) (*AuthData, error) {
+func (c *client) GetAccountsToLogIn(email, password string) (*AccountsResponse, error) {
+	client := resty.New()
+
+	accountsResponse := &AccountsResponse{}
+
+	resp, err := client.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(map[string]interface{}{
+			"email":      email,
+			"password":   password,
+			"rememberMe": true,
+		}).
+		SetResult(&accountsResponse).
+		Post(c.baseURL() + "/launchpad/v1/accounts.json?generic=true")
+
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode() != http.StatusOK {
+		return nil, fmt.Errorf("status code: %d", resp.StatusCode())
+	}
+
+	return accountsResponse, nil
+}
+
+func (c *client) LogIn(apiEndPoint, email, password string) (*AuthData, error) {
 	// Plan:
-	// 1. POST to https://{{.CompanySlug}}.{{.Zone}}.teamwork.com/launchpad/v1/login.json
+	// 1. POST to https://{{apiEndPoint}}launchpad/v1/login.json
 	//  with body: {"email": email, "password": password, "rememberMe": false}
 	// 2. If response status is 200, return AuthData with token from response cookie 'tw-auth'
 	// 3. If response status is not 200, return error
@@ -51,7 +71,7 @@ func (c *client) LogIn(email, password string) (*AuthData, error) {
 			"password":   password,
 			"rememberMe": false,
 		}).
-		Post(c.baseURL() + "/launchpad/v1/login.json")
+		Post(apiEndPoint + "launchpad/v1/login.json")
 
 	if err != nil {
 		return nil, err
@@ -66,23 +86,20 @@ func (c *client) LogIn(email, password string) (*AuthData, error) {
 	cookies := resp.Cookies()
 	for _, cookie := range cookies {
 		if cookie.Name == "tw-auth" {
-			return &AuthData{Token: cookie.Value}, nil
+			return &AuthData{
+				APIEndPoint: apiEndPoint,
+				Token:       cookie.Value,
+			}, nil
 		}
 	}
 
 	return nil, fmt.Errorf("cookie 'tw-auth' not found")
 }
 
-func (c *client) GetMe(authData *AuthData) (*User, error) {
-	// Plan:
-	// 1. GET to https://{{.CompanySlug}}.{{.Zone}}.teamwork.com/launchpad/v1/me.json
-	//  with cookie 'tw-auth' set to authData.Token
-	// 2. If response status is 200, return User from response body
-	// 3. If response status is not 200, return error
-
+func (c *client) GetMe(authData *AuthData) (*ProfileResponse, error) {
 	client := resty.New()
 
-	var user *User
+	user := &ProfileResponse{}
 
 	resp, err := client.R().
 		SetHeader("Content-Type", "application/json").
@@ -91,7 +108,7 @@ func (c *client) GetMe(authData *AuthData) (*User, error) {
 			Value: authData.Token,
 		}).
 		SetResult(user).
-		Get(c.baseURL() + "/launchpad/v1/me.json")
+		Get(authData.APIEndPoint + "me.json")
 
 	if err != nil {
 		return nil, err
