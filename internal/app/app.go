@@ -108,6 +108,7 @@ func (a *app) WhoAmI() error {
 		return err
 	}
 
+	fmt.Println("ID         :", res.Person.ID)
 	fmt.Println("First Name :", res.Person.FirstName)
 	fmt.Println("Last Name  :", res.Person.LastName)
 	fmt.Println("Email      :", res.Person.EmailAddress)

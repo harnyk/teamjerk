@@ -18,6 +18,7 @@ type Client interface {
 	GetMe(authData *AuthData) (*ProfileResponse, error)
 	GetProjects(authData *AuthData) (*ProjectsResponse, error)
 	GetTasks(authData *AuthData) (*TasksResponse, error)
+	LogTime(authData *AuthData, timeLog *LogtimeRequestWithProjectID) error
 }
 
 type client struct {
@@ -150,6 +151,29 @@ func (c *client) GetTasks(authData *AuthData) (*TasksResponse, error) {
 	}
 
 	return tasks, nil
+}
+
+func (c *client) LogTime(authData *AuthData, timeLog *LogtimeRequestWithProjectID) error {
+	var url string
+	if timeLog.Timelog.TaskID != 0 {
+		url = fmt.Sprintf("%sprojects/api/v3/tasks/%d/time.json", authData.APIEndPoint, timeLog.Timelog.TaskID)
+	} else {
+		url = fmt.Sprintf("%sprojects/api/v3/projects/%d/time.json", authData.APIEndPoint, timeLog.ProjectID)
+	}
+
+	resp, err := c.getAuthenticatedRequest(authData).
+		SetBody(timeLog.LogtimeRequest).
+		Post(url)
+
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode() != 200 {
+		return fmt.Errorf("status code: %d", resp.StatusCode())
+	}
+
+	return nil
 }
 
 func (c *client) getAuthenticatedRequest(authData *AuthData) *resty.Request {
