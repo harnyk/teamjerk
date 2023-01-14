@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/bobg/go-generics/slices"
 	"github.com/harnyk/teamjerk/internal/authstore"
@@ -180,4 +181,54 @@ func (a *app) askPassword() (string, error) {
 	}
 
 	return string(password), nil
+}
+
+func (a *app) getProjectsAndTasks(
+	projects twapi.ProjectsResponse,
+	tasks twapi.TasksResponse,
+) ([]twapi.TasksGroup, error) {
+	taskGroups := tasks.GroupByProject()
+
+	projectsIdsFromTaskGroups, _ := slices.Map(taskGroups,
+		func(i int, taskGroup twapi.TasksGroup) (string, error) {
+			idStr := strconv.Itoa(int(taskGroup.Project.ID))
+			return idStr, nil
+		},
+	)
+
+	projectsWithoutTasks, _ := slices.Filter(projects.Projects,
+		func(project twapi.Project) (bool, error) {
+			for _, id := range projectsIdsFromTaskGroups {
+				if project.ID == id {
+					return false, nil
+				}
+			}
+			return true, nil
+		},
+	)
+
+	taskGroupsWithoutTasks, err := slices.Map(projectsWithoutTasks,
+		func(i int, project twapi.Project) (twapi.TasksGroup, error) {
+			id, err := strconv.Atoi(project.ID)
+			if err != nil {
+				return twapi.TasksGroup{}, err
+			}
+
+			return twapi.TasksGroup{
+				Project: twapi.TaskProject{
+					ID:   uint64(id),
+					Name: project.Name,
+				},
+				Tasks: []twapi.Task{},
+			}, nil
+		},
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	taskGroups = append(taskGroups, taskGroupsWithoutTasks...)
+
+	return taskGroups, nil
 }
