@@ -1,5 +1,7 @@
 package twapi
 
+import "fmt"
+
 /*
 
 Example of AccountsResponse:
@@ -88,4 +90,8 @@ type Company struct {
 type ProjectTemplate struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
+}
+
+func (a *Account) String() string {
+	return fmt.Sprintf("%s %s @ %s", a.User.FirstName, a.User.LastName, a.Installation.Company.Name)
 }

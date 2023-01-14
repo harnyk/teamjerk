@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/bobg/go-generics/slices"
 	"github.com/harnyk/teamjerk/internal/authstore"
 	"github.com/harnyk/teamjerk/internal/twapi"
 	"github.com/howeyc/gopass"
+	"github.com/manifoldco/promptui"
 )
 
 type App interface {
@@ -27,50 +29,24 @@ func NewApp(tw twapi.Client, store authstore.AuthStore[twapi.AuthData]) App {
 }
 
 func (a *app) LogIn() error {
-
-	var email string
-	fmt.Print("Email: ")
-	_, err := fmt.Scanln(&email)
+	email, err := a.askEmail()
 	if err != nil {
 		return err
 	}
 
-	password, err := gopass.GetPasswdPrompt("Password: ",
-		false, os.Stdin, os.Stdout)
+	password, err := a.askPassword()
 	if err != nil {
 		return err
 	}
 
-	passwordStr := string(password)
-
-	accounts, err := a.tw.GetAccountsToLogIn(email, passwordStr)
-
-	fmt.Println("Select account:")
-	for i, account := range accounts.Accounts {
-		fmt.Printf("%d) %s %s @ %s\n", i, account.User.FirstName, account.User.LastName, account.Installation.Company.Name)
+	accounts, err := a.tw.GetAccountsToLogIn(email, password)
+	if err != nil {
+		return err
 	}
 
-	var accountIndex int
+	account, err := a.selectAccount(*accounts)
 
-	for {
-		fmt.Print("Account: ")
-		_, err = fmt.Scanln(&accountIndex)
-		if err != nil {
-			return err
-		}
-
-		if accountIndex < 0 || accountIndex >= len(accounts.Accounts) {
-			fmt.Println("Invalid account index")
-			continue
-		}
-
-		break
-	}
-
-	account := accounts.Accounts[accountIndex]
-
-	auth, err := a.tw.LogIn(account.Installation.ApiEndPoint, email, passwordStr)
-
+	auth, err := a.tw.LogIn(account.Installation.ApiEndPoint, email, password)
 	if err != nil {
 		return err
 	}
@@ -79,6 +55,8 @@ func (a *app) LogIn() error {
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("Logged in successfully as %s\n", account.String())
 
 	return nil
 }
@@ -157,4 +135,49 @@ func (a *app) Tasks() error {
 	}
 
 	return nil
+}
+
+func (a *app) selectAccount(accounts twapi.AccountsResponse) (twapi.Account, error) {
+	if len(accounts.Accounts) == 1 {
+		return accounts.Accounts[0], nil
+	}
+
+	accountLabels, _ := slices.Map(accounts.Accounts,
+		func(i int, account twapi.Account) (string, error) {
+			return account.String(), nil
+		})
+
+	prompt := promptui.Select{
+		Label: "Select account",
+		Items: accountLabels,
+	}
+
+	accountIndex, _, err := prompt.Run()
+
+	if err != nil {
+		return twapi.Account{}, err
+	}
+
+	return accounts.Accounts[accountIndex], nil
+}
+
+func (a *app) askEmail() (string, error) {
+	var email string
+	fmt.Print("Email: ")
+	_, err := fmt.Scanln(&email)
+	if err != nil {
+		return "", err
+	}
+
+	return email, nil
+}
+
+func (a *app) askPassword() (string, error) {
+	password, err := gopass.GetPasswdPrompt("Password: ",
+		false, os.Stdin, os.Stdout)
+	if err != nil {
+		return "", err
+	}
+
+	return string(password), nil
 }
