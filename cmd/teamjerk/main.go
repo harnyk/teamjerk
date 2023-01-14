@@ -18,11 +18,12 @@ var version = "development"
 type command string
 
 const (
-	login    command = "login"
-	logout   command = "logout"
-	whoami   command = "whoami"
-	projects command = "projects"
-	tasks    command = "tasks"
+	cmdLogin    command = "login"
+	cmdLogout   command = "logout"
+	cmdWhoami   command = "whoami"
+	cmdProjects command = "projects"
+	cmdTasks    command = "tasks"
+	cmdLog      command = "log"
 )
 
 func getAuthFilePath() (string, error) {
@@ -44,6 +45,7 @@ Usage:
   teamjerk whoami
   teamjerk projects
   teamjerk tasks
+  teamjerk log
 `
 
 	arguments, err := docopt.ParseArgs(usage, nil, version)
@@ -66,16 +68,18 @@ Usage:
 	app := app.NewApp(tw, store)
 
 	switch cmd {
-	case login:
+	case cmdLogin:
 		err = app.LogIn()
-	case logout:
+	case cmdLogout:
 		err = app.LogOut()
-	case whoami:
+	case cmdWhoami:
 		err = app.WhoAmI()
-	case projects:
+	case cmdProjects:
 		err = app.Projects()
-	case tasks:
+	case cmdTasks:
 		err = app.Tasks()
+	case cmdLog:
+		err = app.Log()
 	}
 
 	if err != nil {
@@ -85,7 +89,7 @@ Usage:
 }
 
 func getCommand(arguments docopt.Opts) (command, error) {
-	for _, c := range []command{login, logout, whoami, projects, tasks} {
+	for _, c := range []command{cmdLogin, cmdLogout, cmdWhoami, cmdProjects, cmdTasks, cmdLog} {
 		cmdSelected, err := arguments.Bool(string(c))
 		if err != nil {
 			return "", err

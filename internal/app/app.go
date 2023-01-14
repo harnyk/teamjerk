@@ -18,6 +18,7 @@ type App interface {
 	LogOut() error
 	Projects() error
 	Tasks() error
+	Log() error
 }
 
 type app struct {
@@ -27,6 +28,41 @@ type app struct {
 
 func NewApp(tw twapi.Client, store authstore.AuthStore[twapi.AuthData]) App {
 	return &app{tw: tw, store: store}
+}
+
+func (a *app) Log() error {
+	if !a.store.Exists() {
+		return fmt.Errorf("not logged in")
+	}
+
+	auth, err := a.store.Load()
+	if err != nil {
+		return err
+	}
+
+	tasks, err := a.tw.GetTasks(auth)
+	if err != nil {
+		return err
+	}
+
+	projects, err := a.tw.GetProjects(auth)
+	if err != nil {
+		return err
+	}
+
+	taskGroups, err := a.getProjectsAndTasks(projects, tasks)
+	if err != nil {
+		return err
+	}
+
+	timelogTarget, err := a.selectTimelogTarget(taskGroups)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Selected:", timelogTarget)
+
+	return nil
 }
 
 func (a *app) LogIn() error {
@@ -184,8 +220,8 @@ func (a *app) askPassword() (string, error) {
 }
 
 func (a *app) getProjectsAndTasks(
-	projects twapi.ProjectsResponse,
-	tasks twapi.TasksResponse,
+	projects *twapi.ProjectsResponse,
+	tasks *twapi.TasksResponse,
 ) ([]twapi.TasksGroup, error) {
 	taskGroups := tasks.GroupByProject()
 
@@ -231,4 +267,48 @@ func (a *app) getProjectsAndTasks(
 	taskGroups = append(taskGroups, taskGroupsWithoutTasks...)
 
 	return taskGroups, nil
+}
+
+func (a *app) selectTimelogTarget(taskGroups []twapi.TasksGroup) (*timelogTargetSelection, error) {
+	timelogTargetSelections := []timelogTargetSelection{}
+
+	for _, taskGroup := range taskGroups {
+		timelogTargetSelections = append(timelogTargetSelections, timelogTargetSelection{
+			Project: taskGroup.Project,
+		})
+
+		for _, task := range taskGroup.Tasks {
+			timelogTargetSelections = append(timelogTargetSelections, timelogTargetSelection{
+				Project: taskGroup.Project,
+				Task:    task,
+			})
+		}
+	}
+
+	timelogTargetLabels, _ := slices.Map(timelogTargetSelections,
+		func(i int, selection timelogTargetSelection) (string, error) {
+			if selection.Task.ID == 0 {
+				return selection.Project.Name, nil
+			}
+
+			return fmt.Sprintf("%s / %s", selection.Project.Name, selection.Task.Content), nil
+		},
+	)
+
+	prompt := promptui.Select{
+		Label: "Select timelog target",
+		Items: timelogTargetLabels,
+	}
+
+	timelogTargetIndex, _, err := prompt.Run()
+	if err != nil {
+		return nil, err
+	}
+
+	return &timelogTargetSelections[timelogTargetIndex], nil
+}
+
+type timelogTargetSelection struct {
+	Project twapi.TaskProject
+	Task    twapi.Task
 }
