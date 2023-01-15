@@ -3,6 +3,7 @@ package twapi
 import (
 	"encoding/json"
 	"strconv"
+	"time"
 )
 
 type TimeChartResponse struct {
@@ -10,11 +11,31 @@ type TimeChartResponse struct {
 	User   TimeChart `json:"user"`
 }
 
+type TimeX time.Time
+
+func (t *TimeX) UnmarshalJSON(b []byte) error {
+	var s string
+	err := json.Unmarshal(b, &s)
+	if err != nil {
+		return err
+	}
+
+	i, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	*t = TimeX(time.Unix(i/1000, 0))
+
+	return nil
+}
+
 type TimeChart struct {
 	Billable    []TimeChartEntry `json:"billable"`
 	NonBillable []TimeChartEntry `json:"nonbillable"`
 
-	TimeRange
+	StartEpoch TimeX `json:"startepoch"`
+	EndEpoch   TimeX `json:"endepoch"`
 
 	Id        string `json:"id"`
 	FirstName string `json:"firstname"`
@@ -22,14 +43,9 @@ type TimeChart struct {
 }
 
 type TimeChartEntry struct {
-	Epoch uint64
+	Epoch time.Time
 	Hours float64
 	Min   uint64
-}
-
-type TimeRange struct {
-	StartEpoch uint64
-	EndEpoch   uint64
 }
 
 func (t *TimeChartEntry) UnmarshalJSON(b []byte) error {
@@ -39,10 +55,11 @@ func (t *TimeChartEntry) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	t.Epoch, err = strconv.ParseUint(s[0], 10, 64)
+	millis, err := strconv.ParseInt(s[0], 10, 64)
 	if err != nil {
 		return err
 	}
+	t.Epoch = time.Unix(millis/1000, 0)
 
 	t.Hours, err = strconv.ParseFloat(s[1], 64)
 	if err != nil {
@@ -50,31 +67,6 @@ func (t *TimeChartEntry) UnmarshalJSON(b []byte) error {
 	}
 
 	t.Min, err = strconv.ParseUint(s[2], 10, 64)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (t *TimeRange) UnmarshalJSON(b []byte) error {
-	type alias struct {
-		StartEpoch string `json:"startepoch"`
-		EndEpoch   string `json:"endepoch"`
-	}
-
-	var s alias
-	err := json.Unmarshal(b, &s)
-	if err != nil {
-		return err
-	}
-
-	t.StartEpoch, err = strconv.ParseUint(s.StartEpoch, 10, 64)
-	if err != nil {
-		return err
-	}
-
-	t.EndEpoch, err = strconv.ParseUint(s.EndEpoch, 10, 64)
 	if err != nil {
 		return err
 	}

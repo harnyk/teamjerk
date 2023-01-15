@@ -2,10 +2,11 @@ package twapi_test
 
 import (
 	"encoding/json"
-	"reflect"
 	"testing"
+	"time"
 
 	"github.com/harnyk/teamjerk/internal/twapi"
+	"github.com/ysmood/got"
 )
 
 func TestTimeChartResponse_UnmarshalJSON(t *testing.T) {
@@ -49,30 +50,28 @@ func TestTimeChartResponse_UnmarshalJSON(t *testing.T) {
 	expected := &twapi.TimeChartResponse{
 		Status: "OK",
 		User: twapi.TimeChart{
-			TimeRange: twapi.TimeRange{
-				StartEpoch: 1667260800000,
-				EndEpoch:   1669766400000,
-			},
+			StartEpoch: twapi.TimeX(time.Unix(1667260800000/1000, 0)),
+			EndEpoch:   twapi.TimeX(time.Unix(1669766400000/1000, 0)),
 			Billable: []twapi.TimeChartEntry{
 				{
-					Epoch: 1669680000000,
+					Epoch: time.Unix(1669680000000/1000, 0),
 					Hours: 8.00,
 					Min:   480,
 				},
 				{
-					Epoch: 1669766400000,
+					Epoch: time.Unix(1669766400000/1000, 0),
 					Hours: 8.00,
 					Min:   480,
 				},
 			},
 			NonBillable: []twapi.TimeChartEntry{
 				{
-					Epoch: 1669680000000,
+					Epoch: time.Unix(1669680000000/1000, 0),
 					Hours: 0.00,
 					Min:   0,
 				},
 				{
-					Epoch: 1669766400000,
+					Epoch: time.Unix(1669766400000/1000, 0),
 					Hours: 0.00,
 					Min:   0,
 				},
@@ -87,11 +86,15 @@ func TestTimeChartResponse_UnmarshalJSON(t *testing.T) {
 
 	err := json.Unmarshal(payload, actual)
 
-	if err != nil {
-		t.Errorf("expected no error, got %v", err)
-	}
+	got.T(t).Eq(err, nil)
+	got.T(t).Eq(actual, expected)
 
-	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("expected %v, got %v", expected, actual)
-	}
+	got.T(t).Eq(
+		time.Time(actual.User.StartEpoch).UTC().Format(time.RFC3339),
+		"2022-11-01T00:00:00Z",
+	)
+	got.T(t).Eq(
+		time.Time(actual.User.EndEpoch).UTC().Format(time.RFC3339),
+		"2022-11-30T00:00:00Z",
+	)
 }

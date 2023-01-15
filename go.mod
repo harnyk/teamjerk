@@ -16,5 +16,6 @@ require (
 	github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815
 	github.com/howeyc/gopass v0.0.0-20210920133722-c8aef6fb66ef
 	github.com/manifoldco/promptui v0.9.0
+	github.com/ysmood/got v0.32.0
 	golang.org/x/net v0.5.0 // indirect
 )
