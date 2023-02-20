@@ -1,30 +1,18 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 
-	"github.com/docopt/docopt-go"
 	"github.com/harnyk/teamjerk/internal/app"
 	"github.com/harnyk/teamjerk/internal/authstore"
 	"github.com/harnyk/teamjerk/internal/twapi"
+	"github.com/spf13/cobra"
 )
 
 //this will be replaced in the goreleaser build
 var version = "development"
-
-type command string
-
-const (
-	cmdLogin    command = "login"
-	cmdLogout   command = "logout"
-	cmdWhoami   command = "whoami"
-	cmdProjects command = "projects"
-	cmdTasks    command = "tasks"
-	cmdLog      command = "log"
-)
 
 func getAuthFilePath() (string, error) {
 	home, err := os.UserHomeDir()
@@ -36,28 +24,6 @@ func getAuthFilePath() (string, error) {
 }
 
 func main() {
-
-	usage := `teamjerk
-	
-Usage:
-  teamjerk login
-  teamjerk logout
-  teamjerk whoami
-  teamjerk projects
-  teamjerk tasks
-  teamjerk log
-`
-
-	arguments, err := docopt.ParseArgs(usage, nil, version)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	cmd, err := getCommand(arguments)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	authFilePath, err := getAuthFilePath()
 	if err != nil {
 		log.Fatal(err)
@@ -67,36 +33,89 @@ Usage:
 	store := authstore.NewAuthStore[twapi.AuthData](authFilePath)
 	app := app.NewApp(tw, store)
 
-	switch cmd {
-	case cmdLogin:
-		err = app.LogIn()
-	case cmdLogout:
-		err = app.LogOut()
-	case cmdWhoami:
-		err = app.WhoAmI()
-	case cmdProjects:
-		err = app.Projects()
-	case cmdTasks:
-		err = app.Tasks()
-	case cmdLog:
-		err = app.Log()
+	rootCmd := &cobra.Command{
+		Use:   "teamjerk",
+		Short: "A command line tool for Teamwork.com",
+		Long:  `A command line tool for Teamwork.com`,
+		Run: func(cmd *cobra.Command, args []string) {
+			cmd.Help()
+		},
 	}
 
-	if err != nil {
+	loginCmd := &cobra.Command{
+		Use:   "login",
+		Short: "Login to Teamwork.com",
+		Long:  `Login to Teamwork.com`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return app.LogIn()
+		},
+	}
+
+	logoutCmd := &cobra.Command{
+		Use:   "logout",
+		Short: "Logout from Teamwork.com",
+		Long:  `Logout from Teamwork.com`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return app.LogOut()
+		},
+	}
+
+	whoamiCmd := &cobra.Command{
+		Use:   "whoami",
+		Short: "Show the currently logged in user",
+		Long:  `Show the currently logged in user`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return app.WhoAmI()
+		},
+	}
+
+	projectsCmd := &cobra.Command{
+		Use:   "projects",
+		Short: "List all projects",
+		Long:  `List all projects`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return app.Projects()
+		},
+	}
+
+	tasksCmd := &cobra.Command{
+		Use:   "tasks",
+		Short: "List all tasks",
+		Long:  `List all tasks`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return app.Tasks()
+		},
+	}
+
+	logCmd := &cobra.Command{
+		Use:   "log",
+		Short: "Log time",
+		Long:  `Log time`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return app.Log()
+		},
+	}
+
+	versionCmd := &cobra.Command{
+		Use:   "version",
+		Short: "Print the version number of teamjerk",
+		Long:  `All software has versions. This is teamjerk's`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.Println(version)
+			return nil
+		},
+	}
+
+	rootCmd.AddCommand(loginCmd)
+	rootCmd.AddCommand(logoutCmd)
+	rootCmd.AddCommand(whoamiCmd)
+	rootCmd.AddCommand(projectsCmd)
+	rootCmd.AddCommand(tasksCmd)
+	rootCmd.AddCommand(logCmd)
+	rootCmd.AddCommand(versionCmd)
+
+	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
 	}
 
-}
-
-func getCommand(arguments docopt.Opts) (command, error) {
-	for _, c := range []command{cmdLogin, cmdLogout, cmdWhoami, cmdProjects, cmdTasks, cmdLog} {
-		cmdSelected, err := arguments.Bool(string(c))
-		if err != nil {
-			return "", err
-		}
-		if cmdSelected {
-			return c, nil
-		}
-	}
-	return "", fmt.Errorf("no command found")
 }

@@ -48,6 +48,15 @@
             "program": "${workspaceFolder}/cmd/teamjerk/main.go",
             "console": "integratedTerminal",
             "args": ["log"]
+        },
+        {
+            "name": "version",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/teamjerk/main.go",
+            "console": "integratedTerminal",
+            "args": ["version"]
         }
     ]
 }
