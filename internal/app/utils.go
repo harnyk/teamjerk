@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/bobg/go-generics/slices"
 	"github.com/harnyk/teamjerk/internal/twapi"
@@ -14,6 +15,14 @@ import (
 type timelogTargetSelection struct {
 	Project twapi.TaskProject
 	Task    twapi.Task
+}
+
+func (tts *timelogTargetSelection) Serialize() string {
+	return fmt.Sprintf("%d:%d", tts.Project.ID, tts.Task.ID)
+}
+
+func (tts *timelogTargetSelection) PrettyPrint() string {
+	return fmt.Sprintf("[%s] %s: %s", tts.Serialize(), tts.Project.Name, tts.Task.Content)
 }
 
 // getProjectsAndTasks returns a slice of twapi.TasksGroup
@@ -133,6 +142,34 @@ func selectAccount(accounts twapi.AccountsResponse) (twapi.Account, error) {
 	}
 
 	return accounts.Accounts[accountIndex], nil
+}
+
+//returns a time.Duration between 0 and 24 hours
+//expects a string in the format of "8.5" for 8 hours and 30 minutes
+//Loops until a valid input is given
+func askDuration() time.Duration {
+	for {
+		var durationStr string
+		fmt.Print("Duration (in hours): ")
+		_, err := fmt.Scanln(&durationStr)
+		if err != nil {
+			fmt.Println("Invalid input")
+			continue
+		}
+
+		duration, err := strconv.ParseFloat(durationStr, 64)
+		if err != nil {
+			fmt.Println("Invalid input")
+			continue
+		}
+
+		if duration < 0 || duration > 24 {
+			fmt.Println("Duration must be between 0 and 24 hours")
+			continue
+		}
+
+		return time.Duration(duration * float64(time.Hour))
+	}
 }
 
 func askEmail() (string, error) {

@@ -55,7 +55,11 @@ func (a *app) Log() error {
 		return err
 	}
 
-	fmt.Println("Selected:", timelogTarget)
+	fmt.Println("Selected:", timelogTarget.PrettyPrint())
+
+	duration := askDuration()
+
+	fmt.Println("Duration:", duration.Hours())
 
 	return nil
 }
