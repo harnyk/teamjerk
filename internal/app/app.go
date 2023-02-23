@@ -2,10 +2,14 @@ package app
 
 import (
 	"fmt"
+	"os"
+	"sort"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/harnyk/teamjerk/internal/authstore"
 	"github.com/harnyk/teamjerk/internal/twapi"
+	"github.com/olekukonko/tablewriter"
 )
 
 type App interface {
@@ -83,6 +87,9 @@ func (a *app) LogIn() error {
 	}
 
 	account, err := selectAccount(*accounts)
+	if err != nil {
+		return err
+	}
 
 	auth, err := a.tw.LogIn(account.Installation.ApiEndPoint, email, password)
 	if err != nil {
@@ -193,8 +200,107 @@ func (a *app) Report(beginningOfMonth time.Time) error {
 
 	fmt.Println("Logged time for", beginningOfMonth.Format("2006-01"))
 
-	//just output the result for debugging (with property names)
-	fmt.Printf("%+v\n", res)
+	rangeStart := beginningOfMonth
+	rangeEnd := beginningOfMonth.AddDate(0, 1, 0)
+
+	type chartSeries struct {
+		date            time.Time
+		billableTime    time.Duration
+		nonBillableTime time.Duration
+	}
+
+	chartSeriesMap := make(map[string]*chartSeries)
+
+	date := rangeStart
+	for date.Before(rangeEnd) {
+		dateStr := date.Format("2006-01-02")
+		chartSeriesMap[dateStr] = &chartSeries{
+			date:            date,
+			billableTime:    0,
+			nonBillableTime: 0,
+		}
+		date = date.AddDate(0, 0, 1)
+	}
+
+	for _, item := range res.User.Billable {
+		dateStr := item.Epoch.Format("2006-01-02")
+		d := time.Duration(item.Min) * time.Minute
+		if existing, ok := chartSeriesMap[dateStr]; ok {
+			existing.billableTime = d
+		} else {
+			return fmt.Errorf("date %s out of range", dateStr)
+		}
+	}
+
+	for _, item := range res.User.NonBillable {
+		dateStr := item.Epoch.Format("2006-01-02")
+		d := time.Duration(item.Min) * time.Minute
+		if existing, ok := chartSeriesMap[dateStr]; ok {
+			existing.nonBillableTime = d
+		} else {
+			return fmt.Errorf("date %s out of range", dateStr)
+		}
+	}
+
+	var chartSeriesList []chartSeries
+	for _, v := range chartSeriesMap {
+		chartSeriesList = append(chartSeriesList, *v)
+	}
+
+	sort.Slice(chartSeriesList, func(i, j int) bool {
+		return chartSeriesList[i].date.Before(chartSeriesList[j].date)
+	})
+
+	//Output
+
+	tableRows := [][]string{}
+
+	var totalBillableTime time.Duration
+	var totalNonBillableTime time.Duration
+
+	for _, item := range chartSeriesList {
+		totalBillableTime += item.billableTime
+		totalNonBillableTime += item.nonBillableTime
+
+		var billableTime string
+		if item.billableTime > 0 {
+			billableTime = formatDuration(item.billableTime)
+		}
+
+		var nonBillableTime string
+		if item.nonBillableTime > 0 {
+			nonBillableTime = formatDuration(item.nonBillableTime)
+		}
+
+		var dayColor func(a ...interface{}) string
+		switch item.date.Weekday() {
+		case time.Saturday, time.Sunday:
+			dayColor = color.New(color.FgRed).SprintFunc()
+		default:
+			dayColor = color.New(color.FgWhite).SprintFunc()
+		}
+
+		tableRows = append(tableRows, []string{
+			dayColor(item.date.Format("2006-01-02")),
+			billableTime,
+			nonBillableTime,
+		})
+	}
+
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetAlignment(tablewriter.ALIGN_RIGHT)
+	table.SetHeaderAlignment(tablewriter.ALIGN_CENTER)
+	table.SetFooterAlignment(tablewriter.ALIGN_RIGHT)
+
+	table.SetHeader([]string{"Date", "Billable", "Non-Billable"})
+	table.AppendBulk(tableRows)
+	table.SetFooter([]string{"Total", formatDuration(totalBillableTime), formatDuration(totalNonBillableTime)})
+
+	table.Render()
 
 	return nil
+}
+
+func formatDuration(d time.Duration) string {
+	return fmt.Sprintf("%2d:%02d", int(d.Hours()), int(d.Minutes())%60)
 }

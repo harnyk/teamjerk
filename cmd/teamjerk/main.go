@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -113,6 +114,9 @@ func main() {
 			if year == 0 {
 				year = defaultYear
 			}
+			if year < 2000 || year > 2100 {
+				return fmt.Errorf("invalid year: %d", year)
+			}
 
 			month, err := cmd.Flags().GetInt("month")
 			if err != nil {
@@ -120,6 +124,9 @@ func main() {
 			}
 			if month == 0 {
 				month = defaultMonth
+			}
+			if month < 1 || month > 12 {
+				return fmt.Errorf("invalid month: %d", month)
 			}
 
 			beginningOfMonth := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
