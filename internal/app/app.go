@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/harnyk/teamjerk/internal/authstore"
 	"github.com/harnyk/teamjerk/internal/twapi"
@@ -14,6 +15,7 @@ type App interface {
 	Projects() error
 	Tasks() error
 	Log() error
+	Report(beginningOfMonth time.Time) error
 }
 
 type app struct {
@@ -170,6 +172,29 @@ func (a *app) Tasks() error {
 			fmt.Printf("  [ID: %d] %s\n", task.ID, task.Content)
 		}
 	}
+
+	return nil
+}
+
+func (a *app) Report(beginningOfMonth time.Time) error {
+	if !a.store.Exists() {
+		return fmt.Errorf("not logged in")
+	}
+
+	auth, err := a.store.Load()
+	if err != nil {
+		return err
+	}
+
+	res, err := a.tw.GetLoggedTime(auth, beginningOfMonth)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Logged time for", beginningOfMonth.Format("2006-01"))
+
+	//just output the result for debugging (with property names)
+	fmt.Printf("%+v\n", res)
 
 	return nil
 }

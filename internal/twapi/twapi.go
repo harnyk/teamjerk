@@ -3,6 +3,8 @@ package twapi
 import (
 	"fmt"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/go-resty/resty/v2"
 )
@@ -19,6 +21,7 @@ type Client interface {
 	GetProjects(authData *AuthData) (*ProjectsResponse, error)
 	GetTasks(authData *AuthData) (*TasksResponse, error)
 	LogTime(authData *AuthData, timeLog *LogtimeRequestWithProjectID) error
+	GetLoggedTime(authData *AuthData, beginningOfMonth time.Time) (*TimeChartResponse, error)
 }
 
 type client struct {
@@ -185,4 +188,40 @@ func (c *client) getAuthenticatedRequest(authData *AuthData) *resty.Request {
 			Name:  "tw-auth",
 			Value: authData.Token,
 		})
+}
+
+func (c *client) GetLoggedTime(authData *AuthData, beginningOfMonth time.Time) (*TimeChartResponse, error) {
+	timeChart := &TimeChartResponse{}
+
+	month := beginningOfMonth.Month()
+	year := beginningOfMonth.Year()
+	projectID := 0
+	page := 1
+	pageSize := 50
+
+	user, err := c.GetMe(authData)
+	if err != nil {
+		return nil, err
+	}
+
+	userID := user.Person.ID
+
+	resp, err := c.getAuthenticatedRequest(authData).
+		SetResult(timeChart).
+		SetQueryParam("m", strconv.Itoa(int(month))).
+		SetQueryParam("y", strconv.Itoa(year)).
+		SetQueryParam("projectId", strconv.Itoa(projectID)).
+		SetQueryParam("page", strconv.Itoa(page)).
+		SetQueryParam("pageSize", strconv.Itoa(pageSize)).
+		Get(authData.APIEndPoint + "people/" + userID + "/loggedtime.json")
+
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode() != 200 {
+		return nil, fmt.Errorf("status code: %d", resp.StatusCode())
+	}
+
+	return timeChart, nil
 }

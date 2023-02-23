@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/harnyk/teamjerk/internal/app"
 	"github.com/harnyk/teamjerk/internal/authstore"
@@ -96,6 +97,39 @@ func main() {
 		},
 	}
 
+	reportCmd := &cobra.Command{
+		Use:   "report",
+		Short: "Report time",
+		Long:  `Report time`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			now := time.Now()
+			defaultYear := now.Year()
+			defaultMonth := int(now.Month())
+
+			year, err := cmd.Flags().GetInt("year")
+			if err != nil {
+				return err
+			}
+			if year == 0 {
+				year = defaultYear
+			}
+
+			month, err := cmd.Flags().GetInt("month")
+			if err != nil {
+				return err
+			}
+			if month == 0 {
+				month = defaultMonth
+			}
+
+			beginningOfMonth := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+
+			return app.Report(beginningOfMonth)
+		},
+	}
+	reportCmd.Flags().IntP("year", "y", time.Now().Year(), "Year to report")
+	reportCmd.Flags().IntP("month", "m", int(time.Now().Month()), "Month to report")
+
 	versionCmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print the version number of teamjerk",
@@ -112,6 +146,7 @@ func main() {
 	rootCmd.AddCommand(projectsCmd)
 	rootCmd.AddCommand(tasksCmd)
 	rootCmd.AddCommand(logCmd)
+	rootCmd.AddCommand(reportCmd)
 	rootCmd.AddCommand(versionCmd)
 
 	if err := rootCmd.Execute(); err != nil {
