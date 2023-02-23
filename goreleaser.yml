@@ -1,0 +1,16 @@
+project_name: teamjerk
+
+release:
+  prerelease: auto
+
+builds:
+  - binary: teamjerk
+    main: ./cmd/teamjerk/
+    goos:
+      - windows
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+      - "386"

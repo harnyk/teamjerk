@@ -3,12 +3,13 @@ package app
 import (
 	"fmt"
 	"os"
+	"sort"
+	"time"
 
-	"github.com/bobg/go-generics/slices"
+	"github.com/fatih/color"
 	"github.com/harnyk/teamjerk/internal/authstore"
 	"github.com/harnyk/teamjerk/internal/twapi"
-	"github.com/howeyc/gopass"
-	"github.com/manifoldco/promptui"
+	"github.com/olekukonko/tablewriter"
 )
 
 type App interface {
@@ -17,6 +18,8 @@ type App interface {
 	LogOut() error
 	Projects() error
 	Tasks() error
+	Log() error
+	Report(beginningOfMonth time.Time) error
 }
 
 type app struct {
@@ -28,13 +31,52 @@ func NewApp(tw twapi.Client, store authstore.AuthStore[twapi.AuthData]) App {
 	return &app{tw: tw, store: store}
 }
 
-func (a *app) LogIn() error {
-	email, err := a.askEmail()
+func (a *app) Log() error {
+	if !a.store.Exists() {
+		return fmt.Errorf("not logged in")
+	}
+
+	auth, err := a.store.Load()
 	if err != nil {
 		return err
 	}
 
-	password, err := a.askPassword()
+	tasks, err := a.tw.GetTasks(auth)
+	if err != nil {
+		return err
+	}
+
+	projects, err := a.tw.GetProjects(auth)
+	if err != nil {
+		return err
+	}
+
+	taskGroups, err := getProjectsAndTasks(projects, tasks)
+	if err != nil {
+		return err
+	}
+
+	timelogTarget, err := selectTimelogTarget(taskGroups)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Selected:", timelogTarget.PrettyPrint())
+
+	duration := askDuration()
+
+	fmt.Println("Duration:", duration.Hours())
+
+	return nil
+}
+
+func (a *app) LogIn() error {
+	email, err := askEmail()
+	if err != nil {
+		return err
+	}
+
+	password, err := askPassword()
 	if err != nil {
 		return err
 	}
@@ -44,7 +86,10 @@ func (a *app) LogIn() error {
 		return err
 	}
 
-	account, err := a.selectAccount(*accounts)
+	account, err := selectAccount(*accounts)
+	if err != nil {
+		return err
+	}
 
 	auth, err := a.tw.LogIn(account.Installation.ApiEndPoint, email, password)
 	if err != nil {
@@ -76,6 +121,7 @@ func (a *app) WhoAmI() error {
 		return err
 	}
 
+	fmt.Println("ID         :", res.Person.ID)
 	fmt.Println("First Name :", res.Person.FirstName)
 	fmt.Println("Last Name  :", res.Person.LastName)
 	fmt.Println("Email      :", res.Person.EmailAddress)
@@ -137,47 +183,124 @@ func (a *app) Tasks() error {
 	return nil
 }
 
-func (a *app) selectAccount(accounts twapi.AccountsResponse) (twapi.Account, error) {
-	if len(accounts.Accounts) == 1 {
-		return accounts.Accounts[0], nil
+func (a *app) Report(beginningOfMonth time.Time) error {
+	if !a.store.Exists() {
+		return fmt.Errorf("not logged in")
 	}
 
-	accountLabels, _ := slices.Map(accounts.Accounts,
-		func(i int, account twapi.Account) (string, error) {
-			return account.String(), nil
+	auth, err := a.store.Load()
+	if err != nil {
+		return err
+	}
+
+	res, err := a.tw.GetLoggedTime(auth, beginningOfMonth)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Logged time for", beginningOfMonth.Format("2006-01"))
+
+	rangeStart := beginningOfMonth
+	rangeEnd := beginningOfMonth.AddDate(0, 1, 0)
+
+	type chartSeries struct {
+		date            time.Time
+		billableTime    time.Duration
+		nonBillableTime time.Duration
+	}
+
+	chartSeriesMap := make(map[string]*chartSeries)
+
+	date := rangeStart
+	for date.Before(rangeEnd) {
+		dateStr := date.Format("2006-01-02")
+		chartSeriesMap[dateStr] = &chartSeries{
+			date:            date,
+			billableTime:    0,
+			nonBillableTime: 0,
+		}
+		date = date.AddDate(0, 0, 1)
+	}
+
+	for _, item := range res.User.Billable {
+		dateStr := item.Epoch.Format("2006-01-02")
+		d := time.Duration(item.Min) * time.Minute
+		if existing, ok := chartSeriesMap[dateStr]; ok {
+			existing.billableTime = d
+		} else {
+			return fmt.Errorf("date %s out of range", dateStr)
+		}
+	}
+
+	for _, item := range res.User.NonBillable {
+		dateStr := item.Epoch.Format("2006-01-02")
+		d := time.Duration(item.Min) * time.Minute
+		if existing, ok := chartSeriesMap[dateStr]; ok {
+			existing.nonBillableTime = d
+		} else {
+			return fmt.Errorf("date %s out of range", dateStr)
+		}
+	}
+
+	var chartSeriesList []chartSeries
+	for _, v := range chartSeriesMap {
+		chartSeriesList = append(chartSeriesList, *v)
+	}
+
+	sort.Slice(chartSeriesList, func(i, j int) bool {
+		return chartSeriesList[i].date.Before(chartSeriesList[j].date)
+	})
+
+	//Output
+
+	tableRows := [][]string{}
+
+	var totalBillableTime time.Duration
+	var totalNonBillableTime time.Duration
+
+	for _, item := range chartSeriesList {
+		totalBillableTime += item.billableTime
+		totalNonBillableTime += item.nonBillableTime
+
+		var billableTime string
+		if item.billableTime > 0 {
+			billableTime = formatDuration(item.billableTime)
+		}
+
+		var nonBillableTime string
+		if item.nonBillableTime > 0 {
+			nonBillableTime = formatDuration(item.nonBillableTime)
+		}
+
+		var dayColor func(a ...interface{}) string
+		switch item.date.Weekday() {
+		case time.Saturday, time.Sunday:
+			dayColor = color.New(color.FgRed).SprintFunc()
+		default:
+			dayColor = color.New(color.FgWhite).SprintFunc()
+		}
+
+		tableRows = append(tableRows, []string{
+			dayColor(item.date.Format("2006-01-02")),
+			billableTime,
+			nonBillableTime,
 		})
-
-	prompt := promptui.Select{
-		Label: "Select account",
-		Items: accountLabels,
 	}
 
-	accountIndex, _, err := prompt.Run()
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetAlignment(tablewriter.ALIGN_RIGHT)
+	table.SetHeaderAlignment(tablewriter.ALIGN_CENTER)
+	table.SetFooterAlignment(tablewriter.ALIGN_RIGHT)
 
-	if err != nil {
-		return twapi.Account{}, err
-	}
+	table.SetHeader([]string{"Date", "Billable", "Non-Billable"})
+	table.AppendBulk(tableRows)
+	table.SetFooter([]string{"Total", formatDuration(totalBillableTime), formatDuration(totalNonBillableTime)})
 
-	return accounts.Accounts[accountIndex], nil
+	table.Render()
+
+	return nil
 }
 
-func (a *app) askEmail() (string, error) {
-	var email string
-	fmt.Print("Email: ")
-	_, err := fmt.Scanln(&email)
-	if err != nil {
-		return "", err
-	}
-
-	return email, nil
-}
-
-func (a *app) askPassword() (string, error) {
-	password, err := gopass.GetPasswdPrompt("Password: ",
-		false, os.Stdin, os.Stdout)
-	if err != nil {
-		return "", err
-	}
-
-	return string(password), nil
+func formatDuration(d time.Duration) string {
+	return fmt.Sprintf("%2d:%02d", int(d.Hours()), int(d.Minutes())%60)
 }
