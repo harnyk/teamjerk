@@ -67,6 +67,14 @@ func (a *app) Log() error {
 
 	fmt.Println("Duration:", duration.Hours())
 
+	startTime := askStartTime()
+
+	fmt.Println("Start time:", startTime.Format("15:04:05"))
+
+	date := askDate()
+
+	fmt.Println("Date:", date.Format("2006-01-02"))
+
 	return nil
 }
 

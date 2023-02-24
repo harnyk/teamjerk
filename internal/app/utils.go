@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/fatih/color"
+
 	"github.com/bobg/go-generics/slices"
 	"github.com/harnyk/teamjerk/internal/twapi"
 	"github.com/howeyc/gopass"
@@ -142,6 +144,68 @@ func selectAccount(accounts twapi.AccountsResponse) (twapi.Account, error) {
 	}
 
 	return accounts.Accounts[accountIndex], nil
+}
+
+// askStartTime returns a time.Time in the format of HH:mm
+// by default (if a user just hits Return) it returns 09:00
+// Loops until a valid input is given
+func askStartTime() time.Time {
+	//TODO: make this configurable
+	defaultStartTime := time.Date(0, 0, 0, 9, 0, 0, 0, time.UTC)
+
+	for {
+		var startTimeStr string
+		fmt.Print("Start time (HH:mm): ")
+		color.Yellow(" (default: %s)", defaultStartTime.Format("15:04"))
+		_, err := fmt.Scanln(&startTimeStr)
+		//unexpected newline is returned when user hits Return, so we ignore it
+		if err != nil && err.Error() != "unexpected newline" {
+			fmt.Println("Invalid input")
+			continue
+		}
+
+		if startTimeStr == "" {
+			return time.Date(0, 0, 0, 9, 0, 0, 0, time.UTC)
+		}
+
+		startTime, err := time.Parse("15:04", startTimeStr)
+		if err != nil {
+			fmt.Println("Invalid input")
+			continue
+		}
+
+		return startTime
+	}
+}
+
+// askDate returns a time.Time in the format of YYYY-MM-DD
+// by default (if a user just hits Return) it returns today's date
+// Loops until a valid input is given
+func askDate() time.Time {
+	defaultDate := time.Now()
+
+	for {
+		var dateStr string
+		fmt.Print("Date (YYYY-MM-DD): ")
+		color.Yellow(" (default: %s)", defaultDate.Format("2006-01-02"))
+		_, err := fmt.Scanln(&dateStr)
+		if err != nil && err.Error() != "unexpected newline" {
+			fmt.Println("Invalid input")
+			continue
+		}
+
+		if dateStr == "" {
+			return defaultDate
+		}
+
+		date, err := time.Parse("2006-01-02", dateStr)
+		if err != nil {
+			fmt.Println("Invalid input")
+			continue
+		}
+
+		return date
+	}
 }
 
 //returns a time.Duration between 0 and 24 hours
