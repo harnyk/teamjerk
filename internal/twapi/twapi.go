@@ -75,7 +75,7 @@ func (c *client) LogIn(apiEndPoint, email, password string) (*AuthData, error) {
 		SetBody(map[string]interface{}{
 			"email":      email,
 			"password":   password,
-			"rememberMe": false,
+			"rememberMe": true,
 		}).
 		Post(apiEndPoint + "launchpad/v1/login.json")
 
@@ -83,7 +83,7 @@ func (c *client) LogIn(apiEndPoint, email, password string) (*AuthData, error) {
 		return nil, err
 	}
 
-	if resp.StatusCode() != 200 {
+	if resp.StatusCode() != http.StatusOK {
 		return nil, fmt.Errorf("status code: %d", resp.StatusCode())
 	}
 
@@ -113,7 +113,7 @@ func (c *client) GetMe(authData *AuthData) (*ProfileResponse, error) {
 		return nil, err
 	}
 
-	if resp.StatusCode() != 200 {
+	if resp.StatusCode() != http.StatusOK {
 		return nil, fmt.Errorf("status code: %d", resp.StatusCode())
 	}
 
@@ -131,7 +131,7 @@ func (c *client) GetProjects(authData *AuthData) (*ProjectsResponse, error) {
 		return nil, err
 	}
 
-	if resp.StatusCode() != 200 {
+	if resp.StatusCode() != http.StatusOK {
 		return nil, fmt.Errorf("status code: %d", resp.StatusCode())
 	}
 
@@ -149,7 +149,7 @@ func (c *client) GetTasks(authData *AuthData) (*TasksResponse, error) {
 		return nil, err
 	}
 
-	if resp.StatusCode() != 200 {
+	if resp.StatusCode() != http.StatusOK {
 		return nil, fmt.Errorf("status code: %d", resp.StatusCode())
 	}
 
@@ -172,7 +172,7 @@ func (c *client) LogTime(authData *AuthData, timeLog *LogtimeRequestWithProjectI
 		return err
 	}
 
-	if resp.StatusCode() != 200 {
+	if resp.StatusCode() != http.StatusCreated {
 		return fmt.Errorf("status code: %d", resp.StatusCode())
 	}
 
@@ -219,7 +219,7 @@ func (c *client) GetLoggedTime(authData *AuthData, beginningOfMonth time.Time) (
 		return nil, err
 	}
 
-	if resp.StatusCode() != 200 {
+	if resp.StatusCode() != http.StatusOK {
 		return nil, fmt.Errorf("status code: %d", resp.StatusCode())
 	}
 

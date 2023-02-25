@@ -94,9 +94,69 @@ func main() {
 		Short: "Log time",
 		Long:  `Log time`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			dryRun, err := cmd.Flags().GetBool("dry-run")
+			if err != nil {
+				return err
+			}
+			nonBillable, err := cmd.Flags().GetBool("non-billable")
+			if err != nil {
+				return err
+			}
+
+			projectID, err := cmd.Flags().GetInt("project-id")
+			if err != nil {
+				return err
+			}
+
+			taskID, err := cmd.Flags().GetInt("task-id")
+			if err != nil {
+				return err
+			}
+
+			dateS, err := cmd.Flags().GetString("date")
+			if err != nil {
+				return err
+			}
+			date, err := time.Parse("2006-01-02", dateS)
+			if err != nil {
+				return err
+			}
+
+			timeS, err := cmd.Flags().GetString("time")
+			if err != nil {
+				return err
+			}
+			startTime, err := time.Parse("15:04", timeS)
+			if err != nil {
+				return err
+			}
+
+			hours, err := cmd.Flags().GetFloat64("hours")
+			if err != nil {
+				return err
+			}
+			if hours <= 0 || hours > 24 {
+				return fmt.Errorf("hours must be between 0 and 24")
+			}
+
+			description, err := cmd.Flags().GetString("description")
+			if err != nil {
+				return err
+			}
+
+			//TODO: implement a structure parameter for the log command
+
 			return app.Log()
 		},
 	}
+	logCmd.Flags().BoolP("dry-run", "n", false, "Don't actually log time")
+	logCmd.Flags().BoolP("non-billable", "B", false, "Log time as non-billable")
+	logCmd.Flags().IntP("project-id", "p", 0, "Project ID")
+	logCmd.Flags().IntP("task-id", "t", 0, "Task ID")
+	logCmd.Flags().StringP("date", "d", "", "Date (e.g. 2020-01-31)")
+	logCmd.Flags().StringP("time", "t", "", "Start time (e.g. 09:00)")
+	logCmd.Flags().Float64P("hours", "h", 0, "Number of logged hours (e.g. 8.5)")
+	logCmd.Flags().StringP("description", "d", "", "Description")
 
 	reportCmd := &cobra.Command{
 		Use:   "report",

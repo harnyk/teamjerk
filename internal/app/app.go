@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/fatih/color"
@@ -41,6 +42,16 @@ func (a *app) Log() error {
 		return err
 	}
 
+	user, err := a.tw.GetMe(auth)
+	if err != nil {
+		return err
+	}
+
+	userId, err := strconv.ParseUint(user.Person.ID, 10, 64)
+	if err != nil {
+		return err
+	}
+
 	tasks, err := a.tw.GetTasks(auth)
 	if err != nil {
 		return err
@@ -74,6 +85,31 @@ func (a *app) Log() error {
 	date := askDate()
 
 	fmt.Println("Date:", date.Format("2006-01-02"))
+
+	request := &twapi.LogtimeRequestWithProjectID{
+		LogtimeRequest: twapi.LogtimeRequest{
+			Timelog: twapi.LogtimeTimelog{
+				TaskID:      timelogTarget.Task.ID,
+				Hours:       uint64(duration.Hours()),
+				Minutes:     uint64(duration.Minutes()) % 60,
+				Date:        date.Format("2006-01-02"),
+				Time:        startTime.Format("15:04:05"),
+				Description: "",   //TODO: would be nice to take this from the GitHub activity or at least from a command line argument
+				IsBillable:  true, //TODO: make it configurable from the command line argument
+				UserID:      userId,
+				TagIDs:      []uint64{},
+			},
+			TimelogOptions: twapi.LogtimeTimelogOptions{
+				MarkTaskComplete: false,
+			},
+		},
+		ProjectID: timelogTarget.Project.ID,
+	}
+
+	err = a.tw.LogTime(auth, request)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
