@@ -41,13 +41,27 @@
             "args": ["tasks"]
         },
         {
-            "name": "log",
+            "name": "log ...",
             "type": "go",
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}/cmd/teamjerk/main.go",
             "console": "integratedTerminal",
-            "args": ["log"]
+            "args": [
+                "log",
+                "-p", //project
+                "1",
+                "-t", //task
+                "1",
+                "-d", //date
+                "2020-01-01",
+                "-s", //start time
+                "10:00",
+                "-u", //duration
+                "8",
+                "-n", //dry run
+                "-B" //non billable
+            ]
         },
         {
             "name": "report",

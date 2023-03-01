@@ -33,7 +33,7 @@ func main() {
 
 	tw := twapi.NewClient()
 	store := authstore.NewAuthStore[twapi.AuthData](authFilePath)
-	app := app.NewApp(tw, store)
+	a := app.NewApp(tw, store)
 
 	rootCmd := &cobra.Command{
 		Use:   "teamjerk",
@@ -49,7 +49,7 @@ func main() {
 		Short: "Login to Teamwork.com",
 		Long:  `Login to Teamwork.com`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.LogIn()
+			return a.LogIn()
 		},
 	}
 
@@ -58,7 +58,7 @@ func main() {
 		Short: "Logout from Teamwork.com",
 		Long:  `Logout from Teamwork.com`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.LogOut()
+			return a.LogOut()
 		},
 	}
 
@@ -67,7 +67,7 @@ func main() {
 		Short: "Show the currently logged in user",
 		Long:  `Show the currently logged in user`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.WhoAmI()
+			return a.WhoAmI()
 		},
 	}
 
@@ -76,7 +76,7 @@ func main() {
 		Short: "List all projects",
 		Long:  `List all projects`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.Projects()
+			return a.Projects()
 		},
 	}
 
@@ -85,7 +85,7 @@ func main() {
 		Short: "List all tasks",
 		Long:  `List all tasks`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.Tasks()
+			return a.Tasks()
 		},
 	}
 
@@ -103,12 +103,12 @@ func main() {
 				return err
 			}
 
-			projectID, err := cmd.Flags().GetInt("project-id")
+			projectID, err := cmd.Flags().GetUint64("project-id")
 			if err != nil {
 				return err
 			}
 
-			taskID, err := cmd.Flags().GetInt("task-id")
+			taskID, err := cmd.Flags().GetUint64("task-id")
 			if err != nil {
 				return err
 			}
@@ -131,32 +131,42 @@ func main() {
 				return err
 			}
 
-			hours, err := cmd.Flags().GetFloat64("hours")
+			hours, err := cmd.Flags().GetFloat64("duration")
 			if err != nil {
 				return err
 			}
 			if hours <= 0 || hours > 24 {
 				return fmt.Errorf("hours must be between 0 and 24")
 			}
+			duration := time.Duration(hours * float64(time.Hour))
 
 			description, err := cmd.Flags().GetString("description")
 			if err != nil {
 				return err
 			}
 
-			//TODO: implement a structure parameter for the log command
+			logOptions := app.LogOptions{
+				DryRun:      dryRun,
+				NonBillable: nonBillable,
+				ProjectID:   projectID,
+				TaskID:      taskID,
+				Date:        date,
+				StartTime:   startTime,
+				Description: description,
+				Duration:    duration,
+			}
 
-			return app.Log()
+			return a.Log(logOptions)
 		},
 	}
 	logCmd.Flags().BoolP("dry-run", "n", false, "Don't actually log time")
 	logCmd.Flags().BoolP("non-billable", "B", false, "Log time as non-billable")
-	logCmd.Flags().IntP("project-id", "p", 0, "Project ID")
-	logCmd.Flags().IntP("task-id", "t", 0, "Task ID")
+	logCmd.Flags().Uint64P("project-id", "p", 0, "Project ID")
+	logCmd.Flags().Uint64P("task-id", "t", 0, "Task ID")
 	logCmd.Flags().StringP("date", "d", "", "Date (e.g. 2020-01-31)")
-	logCmd.Flags().StringP("time", "t", "", "Start time (e.g. 09:00)")
-	logCmd.Flags().Float64P("hours", "h", 0, "Number of logged hours (e.g. 8.5)")
-	logCmd.Flags().StringP("description", "d", "", "Description")
+	logCmd.Flags().StringP("time", "s", "", "Start time (e.g. 09:00)")
+	logCmd.Flags().Float64P("duration", "u", 0, "Number of logged hours (e.g. 8.5)")
+	logCmd.Flags().StringP("description", "D", "", "Description")
 
 	reportCmd := &cobra.Command{
 		Use:   "report",
@@ -191,7 +201,7 @@ func main() {
 
 			beginningOfMonth := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
 
-			return app.Report(beginningOfMonth)
+			return a.Report(beginningOfMonth)
 		},
 	}
 	reportCmd.Flags().IntP("year", "y", time.Now().Year(), "Year to report")
