@@ -94,56 +94,82 @@ func main() {
 		Short: "Log time",
 		Long:  `Log time`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+
+			//------------------------------------------------------------------
+
 			dryRun, err := cmd.Flags().GetBool("dry-run")
 			if err != nil {
 				return err
 			}
+
+			//------------------------------------------------------------------
+
 			nonBillable, err := cmd.Flags().GetBool("non-billable")
 			if err != nil {
 				return err
 			}
+
+			//------------------------------------------------------------------
 
 			projectID, err := cmd.Flags().GetUint64("project-id")
 			if err != nil {
 				return err
 			}
 
+			//------------------------------------------------------------------
+
 			taskID, err := cmd.Flags().GetUint64("task-id")
 			if err != nil {
 				return err
 			}
 
+			//------------------------------------------------------------------
+
 			dateS, err := cmd.Flags().GetString("date")
 			if err != nil {
 				return err
 			}
-			date, err := time.Parse("2006-01-02", dateS)
-			if err != nil {
-				return err
+			date := time.Time{}
+			if dateS != "" {
+				date, err = time.Parse("2006-01-02", dateS)
+				if err != nil {
+					return err
+				}
 			}
+
+			//------------------------------------------------------------------
 
 			timeS, err := cmd.Flags().GetString("time")
 			if err != nil {
 				return err
 			}
-			startTime, err := time.Parse("15:04", timeS)
-			if err != nil {
-				return err
+			startTime := time.Time{}
+			if timeS != "" {
+				startTime, err = time.Parse("15:04", timeS)
+				if err != nil {
+					return err
+				}
 			}
+
+			//------------------------------------------------------------------
 
 			hours, err := cmd.Flags().GetFloat64("duration")
 			if err != nil {
 				return err
 			}
-			if hours <= 0 || hours > 24 {
+			if hours < 0 || hours > 24 {
 				return fmt.Errorf("hours must be between 0 and 24")
 			}
 			duration := time.Duration(hours * float64(time.Hour))
+
+			//------------------------------------------------------------------
 
 			description, err := cmd.Flags().GetString("description")
 			if err != nil {
 				return err
 			}
+
+			//------------------------------------------------------------------
 
 			logOptions := app.LogOptions{
 				DryRun:      dryRun,

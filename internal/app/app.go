@@ -67,7 +67,6 @@ func (a *app) Log(options LogOptions) error {
 	}
 	fmt.Println("Target:", prettyPrint)
 
-	// duration := askDuration()
 	var duration time.Duration
 	if options.Duration == 0 {
 		duration = askDuration()
@@ -76,7 +75,6 @@ func (a *app) Log(options LogOptions) error {
 	}
 	fmt.Println("Duration:", duration.Hours())
 
-	// startTime := askStartTime()
 	var startTime time.Time
 	if options.StartTime.IsZero() {
 		startTime = askStartTime()
@@ -109,7 +107,7 @@ func (a *app) Log(options LogOptions) error {
 				Date:        date.Format("2006-01-02"),
 				Time:        startTime.Format("15:04:05"),
 				Description: description, //TODO: would be nice to take this from the GitHub activity or at least from a command line argument
-				IsBillable:  true,        //TODO: make it configurable from the command line argument
+				IsBillable:  !options.NonBillable,
 				UserID:      userId,
 				TagIDs:      []uint64{},
 			},

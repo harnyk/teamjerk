@@ -73,13 +73,13 @@
             "args": ["report"]
         },
         {
-            "name": "report -y 2023 -m 1",
+            "name": "report -y 2023 -m 2",
             "type": "go",
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}/cmd/teamjerk/main.go",
             "console": "integratedTerminal",
-            "args": ["report", "-y", "2023", "-m", "1"]
+            "args": ["report", "-y", "2023", "-m", "2"]
         },
         {
             "name": "version",
