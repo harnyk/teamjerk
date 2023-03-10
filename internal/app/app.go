@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/fatih/color"
@@ -18,7 +19,7 @@ type App interface {
 	LogOut() error
 	Projects() error
 	Tasks() error
-	Log() error
+	Log(options LogOptions) error
 	Report(beginningOfMonth time.Time) error
 }
 
@@ -31,7 +32,7 @@ func NewApp(tw twapi.Client, store authstore.AuthStore[twapi.AuthData]) App {
 	return &app{tw: tw, store: store}
 }
 
-func (a *app) Log() error {
+func (a *app) Log(options LogOptions) error {
 	if !a.store.Exists() {
 		return fmt.Errorf("not logged in")
 	}
@@ -41,33 +42,119 @@ func (a *app) Log() error {
 		return err
 	}
 
-	tasks, err := a.tw.GetTasks(auth)
+	user, err := a.tw.GetMe(auth)
 	if err != nil {
 		return err
 	}
 
-	projects, err := a.tw.GetProjects(auth)
+	userId, err := strconv.ParseUint(user.Person.ID, 10, 64)
 	if err != nil {
 		return err
+	}
+
+	var taskID uint64
+	var projectID uint64
+	var prettyPrint string
+
+	if options.ProjectID == 0 && options.TaskID == 0 {
+		projectID, taskID, prettyPrint, err = a.getProjectAndTaskInteractively(auth)
+		if err != nil {
+			return err
+		}
+	} else {
+		projectID = options.ProjectID
+		taskID = options.TaskID
+	}
+	fmt.Println("Target:", prettyPrint)
+
+	var duration time.Duration
+	if options.Duration == 0 {
+		duration = askDuration()
+	} else {
+		duration = options.Duration
+	}
+	fmt.Println("Duration:", duration.Hours())
+
+	var startTime time.Time
+	if options.StartTime.IsZero() {
+		startTime = askStartTime()
+	} else {
+		startTime = options.StartTime
+	}
+	fmt.Println("Start time:", startTime.Format("15:04:05"))
+
+	var date time.Time
+	if options.Date.IsZero() {
+		date = askDate()
+	} else {
+		date = options.Date
+	}
+	fmt.Println("Date:", date.Format("2006-01-02"))
+
+	description := options.Description
+
+	if options.DryRun {
+		fmt.Println("Dry run, not logging anything")
+		return nil
+	}
+
+	request := &twapi.LogtimeRequestWithProjectID{
+		LogtimeRequest: twapi.LogtimeRequest{
+			Timelog: twapi.LogtimeTimelog{
+				TaskID:      taskID,
+				Hours:       uint64(duration.Hours()),
+				Minutes:     uint64(duration.Minutes()) % 60,
+				Date:        date.Format("2006-01-02"),
+				Time:        startTime.Format("15:04:05"),
+				Description: description, //TODO: would be nice to take this from the GitHub activity or at least from a command line argument
+				IsBillable:  !options.NonBillable,
+				UserID:      userId,
+				TagIDs:      []uint64{},
+			},
+			TimelogOptions: twapi.LogtimeTimelogOptions{
+				MarkTaskComplete: false,
+			},
+		},
+		ProjectID: projectID,
+	}
+
+	err = a.tw.LogTime(auth, request)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (a *app) getProjectAndTaskInteractively(auth *twapi.AuthData) (projectID, taskId uint64, prettyPrint string, err error) {
+	projectID = 0
+	taskId = 0
+
+	projects, err := a.tw.GetProjects(auth)
+	if err != nil {
+		return
+	}
+
+	tasks, err := a.tw.GetTasks(auth)
+	if err != nil {
+		return
 	}
 
 	taskGroups, err := getProjectsAndTasks(projects, tasks)
 	if err != nil {
-		return err
+		return
 	}
 
 	timelogTarget, err := selectTimelogTarget(taskGroups)
 	if err != nil {
-		return err
+		return
 	}
 
-	fmt.Println("Selected:", timelogTarget.PrettyPrint())
+	projectID = timelogTarget.Project.ID
+	taskId = timelogTarget.Task.ID
+	prettyPrint = timelogTarget.PrettyPrint()
 
-	duration := askDuration()
-
-	fmt.Println("Duration:", duration.Hours())
-
-	return nil
+	return
 }
 
 func (a *app) LogIn() error {
