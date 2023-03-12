@@ -1,8 +1,11 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"time"
@@ -20,7 +23,7 @@ type App interface {
 	Projects() error
 	Tasks() error
 	Log(options LogOptions) error
-	Report(beginningOfMonth time.Time) error
+	Report(beginningOfMonth time.Time, outputFileName string) error
 }
 
 type app struct {
@@ -276,7 +279,7 @@ type chartSeries struct {
 	NonBillableTime time.Duration `json:"nonBillable"`
 }
 
-func (a *app) Report(beginningOfMonth time.Time) error {
+func (a *app) Report(beginningOfMonth time.Time, outputFileName string) error {
 	if !a.store.Exists() {
 		return fmt.Errorf("not logged in")
 	}
@@ -290,8 +293,6 @@ func (a *app) Report(beginningOfMonth time.Time) error {
 	if err != nil {
 		return err
 	}
-
-	fmt.Println("Logged time for", beginningOfMonth.Format("2006-01"))
 
 	rangeStart := beginningOfMonth
 	rangeEnd := beginningOfMonth.AddDate(0, 1, 0)
@@ -338,7 +339,49 @@ func (a *app) Report(beginningOfMonth time.Time) error {
 		return chartSeriesList[i].Date.Before(chartSeriesList[j].Date)
 	})
 
+	if outputFileName != "" {
+		return renderReportAsJSON(chartSeriesList, outputFileName)
+	}
+
+	fmt.Println("Logged time for", beginningOfMonth.Format("2006-01"))
+
 	renderReportAsTable(chartSeriesList)
+
+	return nil
+}
+
+func renderReportAsJSON(chartSeriesList []chartSeries, outputFileName string) error {
+	type chartSeriesJSON struct {
+		Date        string  `json:"date"`
+		Billable    float64 `json:"billable"`
+		NonBillable float64 `json:"non_billable"`
+	}
+
+	formattedChartSeriesList := []chartSeriesJSON{}
+
+	for _, item := range chartSeriesList {
+		if item.BillableTime == 0 && item.NonBillableTime == 0 {
+			continue
+		}
+		formattedChartSeriesList = append(formattedChartSeriesList, chartSeriesJSON{
+			Date:        item.Date.Format("2006-01-02"),
+			Billable:    item.BillableTime.Hours(),
+			NonBillable: item.NonBillableTime.Hours(),
+		})
+	}
+
+	jsonData, err := json.MarshalIndent(formattedChartSeriesList, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	if err = os.MkdirAll(filepath.Dir(outputFileName), 0755); err != nil {
+		return err
+	}
+
+	if err = ioutil.WriteFile(outputFileName, jsonData, 0644); err != nil {
+		return err
+	}
 
 	return nil
 }

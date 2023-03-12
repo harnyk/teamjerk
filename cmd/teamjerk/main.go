@@ -227,11 +227,17 @@ func main() {
 
 			beginningOfMonth := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
 
-			return a.Report(beginningOfMonth)
+			outputFileName, err := cmd.Flags().GetString("output")
+			if err != nil {
+				return err
+			}
+
+			return a.Report(beginningOfMonth, outputFileName)
 		},
 	}
 	reportCmd.Flags().IntP("year", "y", time.Now().Year(), "Year to report")
 	reportCmd.Flags().IntP("month", "m", int(time.Now().Month()), "Month to report")
+	reportCmd.Flags().StringP("output", "o", "", "Output JSON file")
 
 	versionCmd := &cobra.Command{
 		Use:   "version",
