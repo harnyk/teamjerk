@@ -1,8 +1,11 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"time"
@@ -20,7 +23,7 @@ type App interface {
 	Projects() error
 	Tasks() error
 	Log(options LogOptions) error
-	Report(beginningOfMonth time.Time) error
+	Report(beginningOfMonth time.Time, outputFileName string) error
 }
 
 type app struct {
@@ -270,7 +273,13 @@ func (a *app) Tasks() error {
 	return nil
 }
 
-func (a *app) Report(beginningOfMonth time.Time) error {
+type chartSeries struct {
+	Date            time.Time     `json:"date"`
+	BillableTime    time.Duration `json:"billable"`
+	NonBillableTime time.Duration `json:"nonBillable"`
+}
+
+func (a *app) Report(beginningOfMonth time.Time, outputFileName string) error {
 	if !a.store.Exists() {
 		return fmt.Errorf("not logged in")
 	}
@@ -285,16 +294,8 @@ func (a *app) Report(beginningOfMonth time.Time) error {
 		return err
 	}
 
-	fmt.Println("Logged time for", beginningOfMonth.Format("2006-01"))
-
 	rangeStart := beginningOfMonth
 	rangeEnd := beginningOfMonth.AddDate(0, 1, 0)
-
-	type chartSeries struct {
-		date            time.Time
-		billableTime    time.Duration
-		nonBillableTime time.Duration
-	}
 
 	chartSeriesMap := make(map[string]*chartSeries)
 
@@ -302,9 +303,9 @@ func (a *app) Report(beginningOfMonth time.Time) error {
 	for date.Before(rangeEnd) {
 		dateStr := date.Format("2006-01-02")
 		chartSeriesMap[dateStr] = &chartSeries{
-			date:            date,
-			billableTime:    0,
-			nonBillableTime: 0,
+			Date:            date,
+			BillableTime:    0,
+			NonBillableTime: 0,
 		}
 		date = date.AddDate(0, 0, 1)
 	}
@@ -313,7 +314,7 @@ func (a *app) Report(beginningOfMonth time.Time) error {
 		dateStr := item.Epoch.Format("2006-01-02")
 		d := time.Duration(item.Min) * time.Minute
 		if existing, ok := chartSeriesMap[dateStr]; ok {
-			existing.billableTime = d
+			existing.BillableTime = d
 		} else {
 			return fmt.Errorf("date %s out of range", dateStr)
 		}
@@ -323,7 +324,7 @@ func (a *app) Report(beginningOfMonth time.Time) error {
 		dateStr := item.Epoch.Format("2006-01-02")
 		d := time.Duration(item.Min) * time.Minute
 		if existing, ok := chartSeriesMap[dateStr]; ok {
-			existing.nonBillableTime = d
+			existing.NonBillableTime = d
 		} else {
 			return fmt.Errorf("date %s out of range", dateStr)
 		}
@@ -335,32 +336,78 @@ func (a *app) Report(beginningOfMonth time.Time) error {
 	}
 
 	sort.Slice(chartSeriesList, func(i, j int) bool {
-		return chartSeriesList[i].date.Before(chartSeriesList[j].date)
+		return chartSeriesList[i].Date.Before(chartSeriesList[j].Date)
 	})
 
-	//Output
+	if outputFileName != "" {
+		return renderReportAsJSON(chartSeriesList, outputFileName)
+	}
 
+	fmt.Println("Logged time for", beginningOfMonth.Format("2006-01"))
+
+	renderReportAsTable(chartSeriesList)
+
+	return nil
+}
+
+func renderReportAsJSON(chartSeriesList []chartSeries, outputFileName string) error {
+	type chartSeriesJSON struct {
+		Date        string  `json:"date"`
+		Billable    float64 `json:"billable"`
+		NonBillable float64 `json:"non_billable"`
+	}
+
+	formattedChartSeriesList := []chartSeriesJSON{}
+
+	for _, item := range chartSeriesList {
+		if item.BillableTime == 0 && item.NonBillableTime == 0 {
+			continue
+		}
+		formattedChartSeriesList = append(formattedChartSeriesList, chartSeriesJSON{
+			Date:        item.Date.Format("2006-01-02"),
+			Billable:    item.BillableTime.Hours(),
+			NonBillable: item.NonBillableTime.Hours(),
+		})
+	}
+
+	jsonData, err := json.MarshalIndent(formattedChartSeriesList, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	if err = os.MkdirAll(filepath.Dir(outputFileName), 0755); err != nil {
+		return err
+	}
+
+	if err = ioutil.WriteFile(outputFileName, jsonData, 0644); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func renderReportAsTable(chartSeriesList []chartSeries) {
 	tableRows := [][]string{}
 
 	var totalBillableTime time.Duration
 	var totalNonBillableTime time.Duration
 
 	for _, item := range chartSeriesList {
-		totalBillableTime += item.billableTime
-		totalNonBillableTime += item.nonBillableTime
+		totalBillableTime += item.BillableTime
+		totalNonBillableTime += item.NonBillableTime
 
 		var billableTime string
-		if item.billableTime > 0 {
-			billableTime = formatDuration(item.billableTime)
+		if item.BillableTime > 0 {
+			billableTime = formatDuration(item.BillableTime)
 		}
 
 		var nonBillableTime string
-		if item.nonBillableTime > 0 {
-			nonBillableTime = formatDuration(item.nonBillableTime)
+		if item.NonBillableTime > 0 {
+			nonBillableTime = formatDuration(item.NonBillableTime)
 		}
 
 		var dayColor func(a ...interface{}) string
-		switch item.date.Weekday() {
+		switch item.Date.Weekday() {
 		case time.Saturday, time.Sunday:
 			dayColor = color.New(color.FgRed).SprintFunc()
 		default:
@@ -368,7 +415,7 @@ func (a *app) Report(beginningOfMonth time.Time) error {
 		}
 
 		tableRows = append(tableRows, []string{
-			dayColor(item.date.Format("2006-01-02")),
+			dayColor(item.Date.Format("2006-01-02")),
 			billableTime,
 			nonBillableTime,
 		})
@@ -384,8 +431,6 @@ func (a *app) Report(beginningOfMonth time.Time) error {
 	table.SetFooter([]string{"Total", formatDuration(totalBillableTime), formatDuration(totalNonBillableTime)})
 
 	table.Render()
-
-	return nil
 }
 
 func formatDuration(d time.Duration) string {
