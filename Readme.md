@@ -80,6 +80,24 @@ Specify year:
     teamjerk report -y 2018 -m 2 # February 2018
 ```
 
+You can additionally specify the `--output=<path/to/file.json>` argument to store the report in a JSON file of the corresponding format:
+
+```json
+[
+  {
+    "date": "2023-03-01",
+    "billable": 8,
+    "non_billable": 0
+  },
+  {
+    "date": "2023-03-02",
+    "billable": 8,
+    "non_billable": 0
+  },
+  ...
+]
+```
+
 ## Log working time
 
 ```shell
